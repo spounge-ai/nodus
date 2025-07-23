@@ -1,0 +1,14 @@
+# pyproject.toml
+[project]
+name = "nodus"
+version = "0.1.0"
+description = "Microservice for Spounge"
+authors = [{ name = "Evan Huang" }]
+requires-python = ">=3.9"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[build-system]
+requires = ["setuptools>=80.9.0", "wheel>=0.45.1"]
+build-backend = "setuptools.build_meta"

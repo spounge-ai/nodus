@@ -2,62 +2,281 @@
 import asyncio
 import grpc
 import logging
+import uuid
+import json
+from datetime import datetime, timezone
+from google.protobuf import timestamp_pb2, duration_pb2, struct_pb2
+from google.protobuf.json_format import MessageToDict
 
-from nodus.protos import (
-    autonomous, autonomous_grpc,
-    direct, direct_grpc,
-    execution, execution_grpc,
-    reasoning, reasoning_grpc,
-    webhook, webhook_grpc
-)
+from nodus.protos import svc, svc_grpc
+from nodus.protos.nodes import execution_pb2 as execution
+from nodus.protos.nodes import direct_pb2 as direct
+from nodus.protos.nodes import reasoning_pb2 as reasoning
+from nodus.protos.nodes import autonomous_pb2 as autonomous
+from nodus.protos.nodes import webhook_pb2 as webhook
+from nodus.protos.common import types_pb2 as common_types
+from nodus.protos.mcp import connection_pb2 as mcp_connection
+from nodus.protos.integrations import llm_pb2 as llm
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def main():
-    async with grpc.aio.insecure_channel('localhost:50051') as channel:
-        logger.info("Connected to gRPC server.")
+class NodusTestClient:
+    def __init__(self, server_address='localhost:50052'):
+        self.server_address = server_address
+        self.channel = None
+        self.stub = None
 
-        auto_stub = autonomous_grpc.AutonomousServiceStub(channel)
-        auto_request = autonomous.CreateNodeRequest(name="MyAutonomousNode")
-        auto_response = await auto_stub.CreateAutonomousNode(auto_request)
-        logger.info(f"Created Autonomous Node: ID={auto_response.node_id}, Status={auto_response.status}")
+    async def __aenter__(self):
+        self.channel = grpc.aio.insecure_channel(self.server_address)
+        self.stub = svc_grpc.NodusServiceStub(self.channel)
+        logger.info(f"Connected to Nodus server at {self.server_address}")
+        return self
 
-        direct_stub = direct_grpc.DirectServiceStub(channel)
-        direct_request = direct.CreateNodeRequest(name="MyDirectNode")
-        direct_response = await direct_stub.CreateDirectNode(direct_request)
-        logger.info(f"Created Direct Node: ID={direct_response.node_id}, Status={direct_response.status}")
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.channel:
+            await self.channel.close()
 
-        exec_stub = execution_grpc.ExecutionServiceStub(channel)
-        exec_request = execution.CreateNodeRequest(name="MyExecutionNode")
-        exec_response = await exec_stub.CreateExecutionNode(exec_request)
-        execution_node_id = exec_response.node_id
-        logger.info(f"Created Execution Node: ID={execution_node_id}, Status={exec_response.status}")
+    def _create_execution_context(self, workflow_id="test-workflow"):
+        return common_types.ExecutionContext(
+            execution_id=str(uuid.uuid4()),
+            workflow_id=workflow_id,
+            user_id="test-user",
+            created_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
 
-        reason_stub = reasoning_grpc.ReasoningServiceStub(channel)
-        reason_request = reasoning.CreateNodeRequest(name="MyReasoningNode")
-        reason_response = await reason_stub.CreateReasoningNode(reason_request)
-        logger.info(f"Created Reasoning Node: ID={reason_response.node_id}, Status={reason_response.status}")
+    async def test_direct_node(self):
+        logger.info("=== Testing Direct Node ===")
+        
+        context = self._create_execution_context()
+        
+        tool_params = struct_pb2.Struct()
+        tool_params.update({"operand1": 10, "operand2": 5, "operation": "add"})
+        
+        direct_config = direct.DirectNodeConfig(
+            mcp_server_id="calculator-server",
+            tool_name="calculator",
+            tool_parameters=tool_params,
+            tool_timeout=duration_pb2.Duration(seconds=5),
+            validate_parameters=True
+        )
 
-        webhook_stub = webhook_grpc.WebhookServiceStub(channel)
-        webhook_request = webhook.CreateNodeRequest(name="MyWebhookNode")
-        webhook_response = await webhook_stub.CreateWebhookNode(webhook_request)
-        logger.info(f"Created Webhook Node: ID={webhook_response.node_id}, Status={webhook_response.status}")
+        request = execution.ExecuteNodeRequest(
+            execution_id=context.execution_id,
+            node_id="direct-calc-001",
+            node_type=common_types.NodeType.NODE_TYPE_DIRECT,
+            timeout=duration_pb2.Duration(seconds=10),
+            max_retries=2,
+            direct_config=direct_config,
+            execution_context=context,
+            requested_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
 
-        if execution_node_id:
-            logger.info(f"Attempting to execute Execution Node: {execution_node_id}")
-            execute_request = execution.ExecuteNodeRequest(
-                node_id=execution_node_id,
-                input_data="This is some input for the execution."
-            )
+        response = await self.stub.ExecuteNode(request)
+        self._print_execution_result(response)
+        return response
+
+    async def test_reasoning_node(self):
+        logger.info("=== Testing Reasoning Node ===")
+        
+        context = self._create_execution_context()
+        
+        llm_config = llm.LLMConfiguration(
+            provider=llm.LLMProvider.LLM_PROVIDER_OPENAI,
+            model_name="gpt-4",
+            credential_id="openai-key"
+        )
+        
+        llm_params = llm.LLMParameters(
+            temperature=0.7,
+            max_tokens=1000,
+            top_p=0.9
+        )
+
+        reasoning_config = reasoning.ReasoningNodeConfig(
+            llm_config=llm_config,
+            model_parameters=llm_params,
+            system_prompt="You are a helpful AI assistant that thinks step by step.",
+            user_prompt="Analyze the pros and cons of remote work.",
+            reasoning_timeout=duration_pb2.Duration(seconds=30)
+        )
+
+        request = execution.ExecuteNodeRequest(
+            execution_id=context.execution_id,
+            node_id="reasoning-001",
+            node_type=common_types.NodeType.NODE_TYPE_REASONING,
+            timeout=duration_pb2.Duration(seconds=45),
+            max_retries=1,
+            reasoning_config=reasoning_config,
+            execution_context=context,
+            requested_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
+
+        response = await self.stub.ExecuteNode(request)
+        self._print_execution_result(response)
+        return response
+
+    async def test_autonomous_node(self):
+        logger.info("=== Testing Autonomous Node ===")
+        
+        context = self._create_execution_context()
+        
+        llm_config = llm.LLMConfiguration(
+            provider=llm.LLMProvider.LLM_PROVIDER_ANTHROPIC,
+            model_name="claude-3",
+            credential_id="anthropic-key"
+        )
+
+        autonomous_config = autonomous.AutonomousNodeConfig(
+            llm_config=llm_config,
+            agent_type=autonomous.AgentType.AGENT_TYPE_REACT,
+            objective="Research and summarize the latest developments in AI safety",
+            system_context="You are an AI research assistant with access to various tools.",
+            max_iterations=5,
+            max_execution_time=duration_pb2.Duration(seconds=120),
+            confidence_threshold=0.8,
+            enable_streaming=False
+        )
+
+        request = execution.ExecuteNodeRequest(
+            execution_id=context.execution_id,
+            node_id="autonomous-001",
+            node_type=common_types.NodeType.NODE_TYPE_AUTONOMOUS,
+            timeout=duration_pb2.Duration(seconds=150),
+            max_retries=1,
+            autonomous_config=autonomous_config,
+            execution_context=context,
+            requested_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
+
+        response = await self.stub.ExecuteNode(request)
+        self._print_execution_result(response)
+        return response
+
+    async def test_webhook_node(self):
+        logger.info("=== Testing Webhook Node ===")
+        
+        context = self._create_execution_context()
+        
+        webhook_config = webhook.WebhookNodeConfig(
+            listen_id="webhook-listener-001",
+            timeout=duration_pb2.Duration(seconds=30),
+            verification_config_name="default-webhook-verification"
+        )
+
+        request = execution.ExecuteNodeRequest(
+            execution_id=context.execution_id,
+            node_id="webhook-001",
+            node_type=common_types.NodeType.NODE_TYPE_WEBHOOK,
+            timeout=duration_pb2.Duration(seconds=60),
+            max_retries=0,
+            webhook_config=webhook_config,
+            execution_context=context,
+            requested_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
+
+        response = await self.stub.ExecuteNode(request)
+        self._print_execution_result(response)
+        return response
+
+    async def test_streaming_execution(self):
+        logger.info("=== Testing Streaming Execution ===")
+        
+        context = self._create_execution_context()
+        
+        autonomous_config = autonomous.AutonomousNodeConfig(
+            agent_type=autonomous.AgentType.AGENT_TYPE_PLANNING,
+            objective="Plan a multi-step data analysis workflow",
+            max_iterations=3,
+            enable_streaming=True,
+            stream_interval_ms=1000
+        )
+
+        request = execution.ExecuteNodeStreamRequest(
+            execution_id=context.execution_id,
+            node_id="streaming-autonomous-001",
+            node_type=common_types.NodeType.NODE_TYPE_AUTONOMOUS,
+            timeout=duration_pb2.Duration(seconds=30),
+            autonomous_config=autonomous_config,
+            execution_context=context,
+            requested_at=timestamp_pb2.Timestamp(seconds=int(datetime.now(timezone.utc).timestamp()))
+        )
+
+        async for response in self.stub.ExecuteNodeStream(request):
+            logger.info(f"Stream update - Status: {common_types.ExecutionStatus.Name(response.status)}")
+            if response.status == common_types.ExecutionStatus.EXECUTION_STATUS_COMPLETED:
+                self._print_execution_result(response)
+                break
+
+    async def test_mcp_operations(self):
+        logger.info("=== Testing MCP Operations ===")
+        
+        register_request = mcp_connection.RegisterMCPServerRequest(
+            server_id="test-mcp-server",
+            endpoint="http://localhost:8080/mcp",
+            server_type=1,
+            metadata={"version": "1.0", "provider": "test"}
+        )
+        
+        register_response = await self.stub.RegisterMCPServer(register_request)
+        logger.info(f"MCP Server registered: {register_response.success}")
+        
+        list_request = mcp_connection.ListMCPServersRequest(include_tools=True)
+        list_response = await self.stub.ListMCPServers(list_request)
+        logger.info(f"Found {list_response.total_servers} MCP servers")
+        
+        tools_request = mcp_connection.QueryMCPToolsRequest(
+            server_ids=["test-mcp-server"],
+            limit=10
+        )
+        tools_response = await self.stub.QueryMCPTools(tools_request)
+        logger.info(f"Found {tools_response.total_matches} tools")
+
+    def _print_execution_result(self, response):
+        logger.info(f"Execution Results:")
+        logger.info(f"  Node ID: {response.node_id}")
+        logger.info(f"  Status: {common_types.ExecutionStatus.Name(response.status)}")
+        logger.info(f"  Execution Time: {response.execution_time.seconds}s")
+        
+        if response.metadata:
+            logger.info(f"  Iterations: {response.metadata.total_iterations}")
+            logger.info(f"  Tool Calls: {response.metadata.tool_invocations}")
+            logger.info(f"  Confidence: {response.metadata.confidence_score}")
+        
+        if response.result_data:
             try:
-                execute_response = await exec_stub.ExecuteNode(execute_request)
-                logger.info(f"Execution Node Output: {execute_response.output}")
-                logger.info(f"Execution Status: {execute_response.status}")
-            except grpc.aio.AioRpcError as e:
-                logger.error(f"Error executing node {execution_node_id}: {e.code().name} - {e.details()}")
-        else:
-            logger.warning("No execution node ID available for execution test.")
+                result_dict = MessageToDict(response.result_data)
+                logger.info(f"  Result: {json.dumps(result_dict, indent=2)}")
+            except Exception as e:
+                logger.info(f"  Result: <unparseable: {e}>")
+        
+        if response.error and response.error.error_message:
+            logger.error(f"  Error: {response.error.error_message}")
+
+async def main():
+    async with NodusTestClient() as client:
+        try:
+            await client.test_direct_node()
+            await asyncio.sleep(1)
+            
+            await client.test_reasoning_node()
+            await asyncio.sleep(1)
+            
+            await client.test_autonomous_node()
+            await asyncio.sleep(1)
+            
+            await client.test_webhook_node()
+            await asyncio.sleep(1)
+            
+            await client.test_streaming_execution()
+            await asyncio.sleep(1)
+            
+            await client.test_mcp_operations()
+            
+        except grpc.aio.AioRpcError as e:
+            logger.error(f"gRPC Error: {e.code().name} - {e.details()}")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
 
 if __name__ == '__main__':
     asyncio.run(main())

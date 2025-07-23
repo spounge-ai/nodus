@@ -31,7 +31,8 @@ def discover_nodus_modules(spounge_path: pathlib.Path) -> List[Dict[str, str]]:
         module_name = parts[-1]
         import_path = ".".join(parts)
         
-        # Remove _pb2 from all, add _grpc suffix for grpc modules
+        # Create both the module reference and individual exports
+        # For api_pb2.py, we want to export both 'api_pb2' (the module) and individual classes
         if module_name.endswith("_pb2_grpc"):
             base_name = module_name.replace("_pb2_grpc", "")
             alias = f"{base_name}_grpc"
@@ -43,7 +44,8 @@ def discover_nodus_modules(spounge_path: pathlib.Path) -> List[Dict[str, str]]:
         modules.append({
             "import_path": import_path,
             "module_name": module_name,
-            "alias": alias
+            "alias": alias,
+            "full_module_name": module_name  # Keep the full name for module-level exports
         })
     
     return sorted(modules, key=lambda x: x["alias"])
@@ -67,27 +69,45 @@ def generate_category_files(modules: List[Dict[str, str]], output_dir: pathlib.P
         imports = []
         aliases = []
         exports = []
+        re_exports = []
         
         for mod in cat_modules:
-            imports.append(f"from spounge.{mod['import_path']} import {mod['module_name']}")
-            aliases.append(f"{mod['alias']} = {mod['module_name']}")
-            exports.append(f'    "{mod["alias"]}",')
+            # Import the module from its parent directory, not from itself
+            parent_import_path = ".".join(mod['import_path'].split('.')[:-1])
+            imports.append(f"from spounge.{parent_import_path} import {mod['module_name']}")
+            
+            # Only create aliases that are different from the original module name
+            if mod['alias'] != mod['module_name']:
+                aliases.append(f"{mod['alias']} = {mod['module_name']}")
+                exports.append(f'    "{mod["alias"]}",')
+            
+            # Always export the full module name (but don't create redundant alias)
+            exports.append(f'    "{mod["full_module_name"]}",')
+            
+            # Skip re-exports for now since gRPC modules are empty
         
-        content = f'''"""
-Nodus {category.title()} Protocol Buffer Aliases.
-"""
-
-# Imports
-{chr(10).join(imports)}
-
-# Aliases
-{chr(10).join(aliases)}
-
-# Exports
-__all__ = [
-{chr(10).join(exports)}
-]
-'''
+        # Combine all parts
+        content_parts = [
+            f'"""',
+            f'Nodus {category.title()} Protocol Buffer Aliases.',
+            f'"""',
+            '',
+            '# Imports',
+            *imports,
+        ]
+        
+        if aliases:
+            content_parts.extend(['', '# Aliases', *aliases])
+        
+        content_parts.extend([
+            '',
+            '# Exports',
+            '__all__ = [',
+            *exports,
+            ']'
+        ])
+        
+        content = '\n'.join(content_parts) + '\n'
         
         output_file = output_dir / f"{category}.py"
         with open(output_file, "w") as f:

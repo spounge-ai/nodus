@@ -4,13 +4,8 @@ import grpc
 from concurrent import futures
 import logging
 
-from nodus.protos import (
-    autonomous_grpc,
-    direct_grpc,
-    execution_grpc,
-    reasoning_grpc,
-    webhook_grpc
-)
+# Import the service_grpc alias from nodus.protos
+from nodus.protos import svc_grpc
 from nodus.core.mock.service import MockNodusService
 
 logging.basicConfig(level=logging.INFO)
@@ -20,15 +15,12 @@ async def serve():
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
     mock_service = MockNodusService()
 
-    autonomous_grpc.add_AutonomousServiceServicer_to_server(mock_service, server)
-    direct_grpc.add_DirectServiceServicer_to_server(mock_service, server)
-    execution_grpc.add_ExecutionServiceServicer_to_server(mock_service, server)
-    reasoning_grpc.add_ReasoningServiceServicer_to_server(mock_service, server)
-    webhook_grpc.add_WebhookServiceServicer_to_server(mock_service, server)
+    # Only add the NodusServiceServicer (as defined in service.proto)
+    svc_grpc.add_NodusServiceServicer_to_server(mock_service, server)
 
-    listen_addr = '[::]:50051'
+    listen_addr = '[::]:50052'
     server.add_insecure_port(listen_addr)
-    logger.info(f"Starting Nodus Mock Server on {listen_addr}")
+    logger.info(f"Starting Nodus Mock Server on {listen_addr} (consolidated service mode)")
     await server.start()
     await server.wait_for_termination()
 

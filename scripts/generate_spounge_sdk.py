@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 # Configuration
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()  # Go up one level from scripts/
 SPOUNGE_PATH = PROJECT_ROOT / "venv" / "lib" / "python3.10" / "site-packages" / "spounge"
-SDK_OUTPUT_DIR = PROJECT_ROOT / "src" / "nodus_service" / "sdk"
+SDK_OUTPUT_DIR = PROJECT_ROOT / "utils" / "sdk"
 
 class ProtoModule(NamedTuple):
     """Represents a protobuf module with metadata."""

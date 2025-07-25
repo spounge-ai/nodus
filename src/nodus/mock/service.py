@@ -16,7 +16,7 @@ from nodus.protos.common import types_pb2 as common_types
 from nodus.protos.mcp import connection_pb2 as mcp_connection
 from nodus.protos.mcp import tool_pb2 as mcp_tool
 from nodus.protos.mcp import server_pb2 as mcp_server
-from nodus.core.mock.data import MOCK_NODE_DATA
+from nodus.mock.data import MOCK_NODE_DATA
 
 logger = logging.getLogger(__name__)
 

@@ -20,7 +20,7 @@ async def serve():
     server.add_insecure_port(listen_addr)
     logger.info(f"Starting Nodus Server on {listen_addr}")
     await server.start()
-    await server.wait_for_termination()
+    await server.wait_for_termination() 
 
 if __name__ == '__main__':
     asyncio.run(serve())

@@ -4,20 +4,21 @@ import logging
 from nodus.protos import svc, svc_grpc
 from nodus.protos.nodes import execution
 from nodus.protos.mcp import connection as mcp_connection
+from nodus.core.application.node_executor import NodeExecutor
+from nodus.core.application.mcp_router import MCPRouter
 
 logger = logging.getLogger(__name__)
 
 class NodusService(svc_grpc.NodusServiceServicer):
     def __init__(self):
+        self.node_executor = NodeExecutor()
+        self.mcp_router = MCPRouter()
         logger.info("NodusService initialized.")
 
     async def ExecuteNode(
         self, request: execution.ExecuteNodeRequest, context: grpc.aio.ServicerContext
     ) -> execution.ExecuteNodeResponse:
-        logger.info(f"ExecuteNode called for node_id: {request.node_id}")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("ExecuteNode is not yet implemented.")
-        raise NotImplementedError("ExecuteNode is not yet implemented.")
+        return await self.node_executor.execute(request, context)
 
     async def ExecuteNodeStream(
         self,
@@ -34,30 +35,21 @@ class NodusService(svc_grpc.NodusServiceServicer):
         request: mcp_connection.RegisterMCPServerRequest,
         context: grpc.aio.ServicerContext,
     ) -> mcp_connection.RegisterMCPServerResponse:
-        logger.info(f"RegisterMCPServer called for server_id: {request.server_id}")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("RegisterMCPServer is not yet implemented.")
-        raise NotImplementedError("RegisterMCPServer is not yet implemented.")
+        return await self.mcp_router.register_mcp_server(request, context)
 
     async def ListMCPServers(
         self,
         request: mcp_connection.ListMCPServersRequest,
         context: grpc.aio.ServicerContext,
     ) -> mcp_connection.ListMCPServersResponse:
-        logger.info("ListMCPServers called.")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("ListMCPServers is not yet implemented.")
-        raise NotImplementedError("ListMCPServers is not yet implemented.")
+        return await self.mcp_router.list_mcp_servers(request, context)
 
     async def QueryMCPTools(
         self,
         request: mcp_connection.QueryMCPToolsRequest,
         context: grpc.aio.ServicerContext,
     ) -> mcp_connection.QueryMCPToolsResponse:
-        logger.info("QueryMCPTools called.")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details("QueryMCPTools is not yet implemented.")
-        raise NotImplementedError("QueryMCPTools is not yet implemented.")
+        return await self.mcp_router.query_mcp_tools(request, context)
 
     async def CheckHealth(
         self, request: svc.CheckHealthRequest, context: grpc.aio.ServicerContext

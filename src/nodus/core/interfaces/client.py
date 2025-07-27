@@ -107,10 +107,9 @@ class NodusTestClient:
             model_name="gemini-pro",
             credential_id="gemini-api-key"
         )
-        llm_params_gemini = integrations.llm.LLMParameters(temperature=0.5)
         reasoning_config_gemini = nodes.reasoning.ReasoningNodeConfig(
             llm_config=llm_config_gemini,
-            model_parameters=llm_params_gemini,
+            model_parameters=integrations.llm.LLMParameters(temperature=0.5),
             system_prompt="You are a concise AI assistant.",
             user_prompt="Summarize the benefits of renewable energy.",
             reasoning_timeout=duration_pb2.Duration(seconds=30)

@@ -23,7 +23,7 @@ class ReasoningExecutor(BaseExecutor):
         logger.info(f"Executing reasoning node: {request.node_id}")
 
         llm_config = request.reasoning_config.llm_config
-        llm = self.llm_manager.get_llm(llm_config)
+        llm = self.llm_manager.get_llm(llm_config, request.reasoning_config.model_parameters)
         tools = self._get_tools(request.reasoning_config.allowed_tools)
         llm_with_tools = llm.bind_tools(tools)
 

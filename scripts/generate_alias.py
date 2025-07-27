@@ -22,7 +22,7 @@ def discover_nodus_modules(spounge_path: pathlib.Path) -> List[Dict[str, str]]:
         return []
     
     modules = []
-    seen_aliases = set()
+    
     
     for proto_file in nodus_path.rglob("*_pb2*.py"):
         rel_path = proto_file.relative_to(spounge_path).with_suffix("")
@@ -69,7 +69,6 @@ def generate_category_files(modules: List[Dict[str, str]], output_dir: pathlib.P
         imports = []
         aliases = []
         exports = []
-        re_exports = []
         
         for mod in cat_modules:
             # Import the module from its parent directory, not from itself
@@ -88,9 +87,9 @@ def generate_category_files(modules: List[Dict[str, str]], output_dir: pathlib.P
         
         # Combine all parts
         content_parts = [
-            f'"""',
+            '"""',
             f'Nodus {category.title()} Protocol Buffer Aliases.',
-            f'"""',
+            '"""',
             '',
             '# Imports',
             *imports,

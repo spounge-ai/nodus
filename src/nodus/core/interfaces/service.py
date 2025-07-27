@@ -1,9 +1,8 @@
 import grpc
 import logging
 
-from nodus.protos import svc, svc_grpc
-from nodus.protos.nodes import execution
-from nodus.protos.mcp import connection as mcp_connection
+from nodus.protos import nodes, mcp
+from nodus.protos.service import svc, svc_grpc
 from nodus.core.application.node_executor import NodeExecutor
 from nodus.core.application.mcp_router import MCPRouter
 
@@ -16,15 +15,15 @@ class NodusService(svc_grpc.NodusServiceServicer):
         logger.info("NodusService initialized.")
 
     async def ExecuteNode(
-        self, request: execution.ExecuteNodeRequest, context: grpc.aio.ServicerContext
-    ) -> execution.ExecuteNodeResponse:
+        self, request: nodes.execution.ExecuteNodeRequest, context: grpc.aio.ServicerContext
+    ) -> nodes.execution.ExecuteNodeResponse:
         return await self.node_executor.execute(request, context)
 
     async def ExecuteNodeStream(
         self,
-        request: execution.ExecuteNodeStreamRequest,
+        request: nodes.execution.ExecuteNodeStreamRequest,
         context: grpc.aio.ServicerContext,
-    ) -> execution.ExecuteNodeStreamResponse:
+    ) -> nodes.execution.ExecuteNodeStreamResponse:
         logger.info(f"ExecuteNodeStream called for node_id: {request.node_id}")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("ExecuteNodeStream is not yet implemented.")
@@ -32,23 +31,23 @@ class NodusService(svc_grpc.NodusServiceServicer):
 
     async def RegisterMCPServer(
         self,
-        request: mcp_connection.RegisterMCPServerRequest,
+        request: mcp.connection.RegisterMCPServerRequest,
         context: grpc.aio.ServicerContext,
-    ) -> mcp_connection.RegisterMCPServerResponse:
+    ) -> mcp.connection.RegisterMCPServerResponse:
         return await self.mcp_router.register_mcp_server(request, context)
 
     async def ListMCPServers(
         self,
-        request: mcp_connection.ListMCPServersRequest,
+        request: mcp.connection.ListMCPServersRequest,
         context: grpc.aio.ServicerContext,
-    ) -> mcp_connection.ListMCPServersResponse:
+    ) -> mcp.connection.ListMCPServersResponse:
         return await self.mcp_router.list_mcp_servers(request, context)
 
     async def QueryMCPTools(
         self,
-        request: mcp_connection.QueryMCPToolsRequest,
+        request: mcp.connection.QueryMCPToolsRequest,
         context: grpc.aio.ServicerContext,
-    ) -> mcp_connection.QueryMCPToolsResponse:
+    ) -> mcp.connection.QueryMCPToolsResponse:
         return await self.mcp_router.query_mcp_tools(request, context)
 
     async def CheckHealth(

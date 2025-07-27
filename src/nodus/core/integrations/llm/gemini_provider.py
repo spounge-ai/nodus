@@ -1,8 +1,7 @@
 # src/nodus/core/integrations/llm/gemini_provider.py
-import os
 import logging
 from langchain_google_genai import ChatGoogleGenerativeAI
-from nodus.protos.integrations import llm_pb2 as llm_protos
+from nodus.protos import integrations
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +9,7 @@ class GeminiLLMProvider:
     def __init__(self, polykey_client):
         self.polykey_client = polykey_client
 
-    def get_llm(self, llm_config: llm_protos.LLMConfiguration):
+    def get_llm(self, llm_config: integrations.llm.LLMConfiguration):
         api_key = self.polykey_client.get_credential(llm_config.credential_id)
         if not api_key:
             raise ValueError(f"API key not found for credential_id: {llm_config.credential_id}")

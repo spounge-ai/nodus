@@ -4,7 +4,7 @@ import grpc
 from concurrent import futures
 import logging
 
-from nodus.protos import svc_grpc
+from nodus.protos.service import svc_grpc
 from nodus.core.interfaces.service import NodusService
 
 logging.basicConfig(level=logging.INFO)

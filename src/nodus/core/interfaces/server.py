@@ -3,16 +3,23 @@ import asyncio
 import grpc
 from concurrent import futures
 import logging
+import argparse
 
 from nodus.protos.service import svc_grpc
 from nodus.core.interfaces.service import NodusService
+from nodus.mock.service import MockNodusService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def serve():
+async def serve(mock: bool = False):
     server = grpc.aio.server(futures.ThreadPoolExecutor(max_workers=10))
-    service = NodusService()
+    if mock:
+        service = MockNodusService()
+        logger.info("Using MockNodusService")
+    else:
+        service = NodusService()
+        logger.info("Using NodusService")
 
     svc_grpc.add_NodusServiceServicer_to_server(service, server)
 
@@ -23,4 +30,7 @@ async def serve():
     await server.wait_for_termination() 
 
 if __name__ == '__main__':
-    asyncio.run(serve())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mock", action="store_true", help="Run the server with the mock service.")
+    args = parser.parse_args()
+    asyncio.run(serve(args.mock))

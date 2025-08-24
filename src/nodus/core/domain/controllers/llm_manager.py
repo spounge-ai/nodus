@@ -11,10 +11,18 @@ class LLMManager:
     def __init__(self):
         self.polykey_client = PolykeyClient()
         self.llm_providers = {
-            integrations.llm.LLM_PROVIDER_OPENAI: lambda config, params: ChatOpenAI(model=config.model_name, temperature=params.temperature if params is not None else 0.7),
+            integrations.llm.LLM_PROVIDER_OPENAI: self._get_openai_llm,
             integrations.llm.LLM_PROVIDER_GOOGLE: lambda config, params: GeminiLLMProvider(self.polykey_client).get_llm(config, params),
             # Add other LLM providers here as needed
         }
+
+    def _get_openai_llm(self, config, params):
+        api_key = self.polykey_client.get_credential(config.credential_id)
+        return ChatOpenAI(
+            model=config.model_name,
+            temperature=params.temperature if params is not None else 0.7,
+            api_key=api_key,
+        )
 
     def get_llm(self, llm_config: integrations.llm.LLMConfiguration, llm_parameters: integrations.llm.LLMParameters = None):
         llm_provider_func = self.llm_providers.get(llm_config.provider)

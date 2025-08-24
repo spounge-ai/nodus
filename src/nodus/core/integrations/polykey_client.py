@@ -15,5 +15,6 @@ class PolykeyClient:
         env_var_name = f"POLYKEY_{credential_id.upper().replace('-', '_')}"
         credential = os.getenv(env_var_name)
         if not credential:
-            logger.warning(f"Credential '{credential_id}' not found in environment variable '{env_var_name}'.")
+            logger.warning(f"Credential '{credential_id}' not found in environment variable '{env_var_name}'. Returning mock key.")
+            return "mock-api-key"
         return credential

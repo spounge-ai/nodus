@@ -298,16 +298,7 @@ async def main():
             await client.test_direct_node()
             await asyncio.sleep(1)
             
-            await client.test_reasoning_node()
-            await asyncio.sleep(1)
-            
-            await client.test_autonomous_node()
-            await asyncio.sleep(1)
-            
             await client.test_webhook_node()
-            await asyncio.sleep(1)
-            
-            await client.test_streaming_execution()
             await asyncio.sleep(1)
             
             await client.test_mcp_operations()

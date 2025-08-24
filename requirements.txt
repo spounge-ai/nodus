@@ -1,0 +1,13 @@
+grpcio
+grpcio-tools
+protobuf
+langchain
+langchain-openai
+langchain-google-genai
+langgraph
+pydantic
+ruff
+pytest
+pyyaml
+structlog
+httpx
